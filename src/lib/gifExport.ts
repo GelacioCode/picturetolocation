@@ -1,11 +1,11 @@
 import { GIFEncoder, quantize, applyPalette } from 'gifenc'
 import type { VisitStats } from '../types'
 
-const GIF_W = 700
-const GIF_H = 440
-const CARD_H = 108
-const FPS = 10
-const DURATION_MS = 3500
+const GIF_W = 960
+const GIF_H = 580
+const CARD_H = 118
+const FPS = 12
+const DURATION_MS = 4000
 const FRAME_COUNT = Math.round((FPS * DURATION_MS) / 1000) // 35
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

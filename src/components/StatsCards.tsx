@@ -1,3 +1,4 @@
+import { MdPublic, MdPlace, MdHome, MdAddAPhoto } from 'react-icons/md'
 import type { VisitStats } from '../types'
 
 interface Props {
@@ -6,33 +7,46 @@ interface Props {
 }
 
 function Card({
+  icon,
   label,
   value,
   sub,
-  icon,
 }: {
+  icon: React.ReactNode
   label: string
   value: string
   sub?: string
-  icon: string
 }) {
   return (
-    <div className="glass-card rounded-xl p-3 flex items-center gap-2.5 min-w-0">
-      <span className="text-2xl shrink-0 leading-none">{icon}</span>
+    <div
+      className="glass-card rounded-2xl px-3 py-3 flex items-center gap-3 min-w-0"
+    >
+      {/* Icon circle */}
+      <div
+        className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center"
+        style={{ background: 'rgba(99,102,241,0.15)' }}
+      >
+        <span style={{ color: '#818cf8', fontSize: 20, lineHeight: 1 }}>{icon}</span>
+      </div>
+
+      {/* Text */}
       <div className="min-w-0 flex-1">
         <div
-          className="text-sm sm:text-base font-bold text-white leading-tight"
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
+          className="font-bold leading-tight truncate"
+          style={{ color: 'var(--text)', fontSize: 15 }}
           title={value}
         >
           {value}
         </div>
-        {sub && <div className="text-[10px] text-indigo-300 leading-tight mt-0.5">{sub}</div>}
-        <div className="text-[9px] sm:text-[10px] text-white/35 uppercase tracking-wider leading-tight mt-0.5">
+        {sub && (
+          <div className="text-[11px] leading-tight mt-0.5" style={{ color: 'var(--text-sub)' }}>
+            {sub}
+          </div>
+        )}
+        <div
+          className="text-[9px] uppercase tracking-widest mt-0.5 leading-tight"
+          style={{ color: 'var(--text-muted)' }}
+        >
           {label}
         </div>
       </div>
@@ -41,19 +55,17 @@ function Card({
 }
 
 export default function StatsCards({ stats, onUploadClick }: Props) {
-  // Mobile: 2×2 grid. Desktop: single row flex.
   return (
     <div className="px-3 py-2">
-      {/* 2-column grid on mobile, flex row on sm+ */}
       <div className="grid grid-cols-2 sm:flex sm:items-stretch gap-2">
         <Card
-          icon="🗺️"
+          icon={<MdPublic />}
           label="Countries"
           value={stats ? String(stats.countriesVisited) : '—'}
           sub={stats ? `${stats.totalPhotos} photo${stats.totalPhotos !== 1 ? 's' : ''}` : undefined}
         />
         <Card
-          icon="📍"
+          icon={<MdPlace />}
           label="Most Visited"
           value={stats?.mostVisitedCountry || '—'}
           sub={
@@ -63,20 +75,22 @@ export default function StatsCards({ stats, onUploadClick }: Props) {
           }
         />
         <Card
-          icon="🏠"
+          icon={<MdHome />}
           label="Origin"
           value={stats?.originCountry || '—'}
         />
-        {/* Add Photos button — spans both columns on mobile */}
+
+        {/* Add Photos */}
         <button
           onClick={onUploadClick}
-          className="glass-card rounded-xl p-3 flex items-center justify-center gap-2
-                     text-sm font-semibold text-indigo-300 border border-indigo-500/30
-                     hover:border-indigo-400/60 hover:bg-indigo-500/10 active:bg-indigo-500/20
-                     transition-all touch-manipulation"
+          className="glass-card rounded-2xl px-3 py-3 flex items-center justify-center gap-2
+                     transition-all active:scale-95 touch-manipulation"
+          style={{ color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.12)')}
+          onMouseLeave={e => (e.currentTarget.style.background = '')}
         >
-          <span className="text-lg leading-none">+</span>
-          <span>Add Photos</span>
+          <MdAddAPhoto size={20} />
+          <span className="font-semibold text-sm">Add Photos</span>
         </button>
       </div>
     </div>
