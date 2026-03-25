@@ -26,14 +26,17 @@ export interface GlobeHandle {
 const RENDERER_CONFIG = { preserveDrawingBuffer: true, antialias: true }
 
 // ── Color constants ──────────────────────────────────────────
-const COLOR_VISITED_POLYGON  = 'rgba(74, 222, 128, 0.08)'   // very subtle country ghost
-const COLOR_ORIGIN_POLYGON   = 'rgba(251, 146, 60, 0.14)'   // subtle amber for home country
-const COLOR_UNVISITED        = 'rgba(18, 26, 58, 0.50)'
+// Polygon layer = country-level tint (shows which countries have photos)
+const COLOR_VISITED_POLYGON  = 'rgba(74, 222, 128, 0.38)'   // clear green for visited countries
+const COLOR_ORIGIN_POLYGON   = 'rgba(251, 146, 60, 0.42)'   // warm amber for home country
+const COLOR_UNVISITED        = 'rgba(18, 26, 58, 0.52)'
 
-const COLOR_HEX_VISIT_TOP   = 'rgba(74, 222, 128, 0.88)'    // bright green — visited areas
-const COLOR_HEX_VISIT_SIDE  = 'rgba(74, 222, 128, 0.25)'
-const COLOR_HEX_ORIGIN_TOP  = 'rgba(251, 146, 60, 0.90)'    // warm amber — home-country areas
-const COLOR_HEX_ORIGIN_SIDE = 'rgba(251, 146, 60, 0.28)'
+// Hex-bin layer = precise sub-country highlight at actual GPS coordinates
+// Sits ABOVE the polygon layer (higher altitude) to show exact visited spots
+const COLOR_HEX_VISIT_TOP   = 'rgba(52, 211, 153, 0.95)'    // vivid teal-green
+const COLOR_HEX_VISIT_SIDE  = 'rgba(52, 211, 153, 0.35)'
+const COLOR_HEX_ORIGIN_TOP  = 'rgba(251, 146, 60, 0.95)'    // vivid amber for home spots
+const COLOR_HEX_ORIGIN_SIDE = 'rgba(251, 146, 60, 0.38)'
 
 const GlobeView = forwardRef<GlobeHandle, Props>((props, ref) => {
   const globeRef = useRef<any>(null)
@@ -196,9 +199,9 @@ const GlobeView = forwardRef<GlobeHandle, Props>((props, ref) => {
           polygonStrokeColor={() => 'rgba(100,130,220,0.20)'}
           polygonAltitude={(d: any) => {
             const code: string = d?.properties?.ISO_A2 ?? ''
-            if (code === originCode) return 0.012
-            if (visited.has(code))   return 0.008
-            return 0.004
+            if (code === originCode) return 0.015
+            if (visited.has(code))   return 0.012
+            return 0.005
           }}
 
           // ── Hex-bin layer — highlights EXACT visited sub-regions ──
@@ -207,8 +210,8 @@ const GlobeView = forwardRef<GlobeHandle, Props>((props, ref) => {
           hexBinPointLat={(d: any) => (d as Photo).lat}
           hexBinPointLng={(d: any) => (d as Photo).lng}
           hexBinResolution={4}
-          hexMargin={0.2}
-          hexAltitude={0.025}
+          hexMargin={0.15}
+          hexAltitude={0.05}
           hexTopColor={(d: any) => {
             // d is an array of Photo objects in this hex cell
             const inOrigin = originCode && (d as Photo[]).some(p => p.countryCode === originCode)
