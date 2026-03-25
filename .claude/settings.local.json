@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e \"const pkg = require\\(''./node_modules/three/package.json''\\); console.log\\(Object.keys\\(pkg.exports || {}\\).filter\\(k => k.includes\\(''webgpu''\\)\\)\\)\")",
+      "Bash(node -e \"const pkg = require\\(''''./node_modules/three/package.json''''\\); console.log\\(''''version:'''', pkg.version, ''''webgpu exports:'''', Object.keys\\(pkg.exports || {}\\).filter\\(k => k.includes\\(''''webgpu''''\\)\\)\\)\")"
+    ]
+  }
+}
