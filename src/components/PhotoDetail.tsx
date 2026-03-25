@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react'
 import { MdClose, MdLocationOn, MdCalendarMonth, MdPhoto, MdDeleteOutline, MdOpenInNew } from 'react-icons/md'
 import type { Photo } from '../types'
 
@@ -32,6 +33,14 @@ function InfoRow({ icon, label, value, mono = false }: {
 }
 
 export default function PhotoDetail({ photo, onClose, onDelete }: Props) {
+  // Guard against iOS ghost clicks: touchend on pin opens modal, then ~300ms later
+  // a synthetic click fires at the same coords and lands on the backdrop, closing it instantly.
+  const allowClose = useRef(false)
+  useEffect(() => {
+    const t = setTimeout(() => { allowClose.current = true }, 400)
+    return () => clearTimeout(t)
+  }, [])
+
   const date = photo.datetime ? new Date(photo.datetime) : null
 
   const dateStr = date
@@ -57,7 +66,7 @@ export default function PhotoDetail({ photo, onClose, onDelete }: Props) {
     <div
       className="modal-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-      onClick={onClose}
+      onClick={() => { if (allowClose.current) onClose() }}
     >
       <div
         className="modal-panel w-full sm:max-w-sm overflow-hidden flex flex-col"
