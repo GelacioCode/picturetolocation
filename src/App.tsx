@@ -17,31 +17,26 @@ export default function App() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [isRecording, setIsRecording] = useState(false)
 
-  // Show origin modal if no origin is set yet (after initial load)
   const showOrigin = !loading && !origin
-
-  async function handleOriginConfirm(o: OriginCountry) {
-    await setOrigin(o)
-  }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#07071a] flex items-center justify-center">
+      <div className="flex items-center justify-center bg-[#07071a]" style={{ height: '100dvh' }}>
         <div className="text-white/40 text-sm animate-pulse">Loading your map…</div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#07071a]">
+    // 100dvh = actual visible viewport on iOS Safari (accounts for browser chrome)
+    <div className="flex flex-col bg-[#07071a] overflow-hidden" style={{ height: '100dvh' }}>
+
       {/* Header */}
-      <header className="flex items-center justify-between px-5 pt-5 pb-2 shrink-0">
+      <header className="flex items-center justify-between px-4 pt-4 pb-1 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">My Travel Map</h1>
+          <h1 className="text-lg font-bold text-white tracking-tight leading-tight">My Travel Map</h1>
           {origin && (
-            <p className="text-xs text-white/35 mt-0.5">
-              Exploring from {origin.name}
-            </p>
+            <p className="text-[11px] text-white/35 leading-tight">Exploring from {origin.name}</p>
           )}
         </div>
         <ShareButton
@@ -53,10 +48,12 @@ export default function App() {
       </header>
 
       {/* Stats cards */}
-      <StatsCards stats={stats} onUploadClick={() => setShowUpload(true)} />
+      <div className="shrink-0">
+        <StatsCards stats={stats} onUploadClick={() => setShowUpload(true)} />
+      </div>
 
-      {/* Globe — takes remaining viewport height */}
-      <div className="flex-1 min-h-0" style={{ minHeight: '400px' }}>
+      {/* Globe — flex-1 fills remaining height since parent has 100dvh */}
+      <div className="flex-1 min-h-0 relative">
         <GlobeView
           ref={globeRef}
           photos={photos}
@@ -71,7 +68,7 @@ export default function App() {
       </div>
 
       {/* Modals */}
-      {showOrigin && <OriginModal onConfirm={handleOriginConfirm} />}
+      {showOrigin && <OriginModal onConfirm={(o: OriginCountry) => setOrigin(o)} />}
 
       {showUpload && (
         <UploadModal

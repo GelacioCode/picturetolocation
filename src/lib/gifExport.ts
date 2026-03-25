@@ -3,7 +3,7 @@ import type { VisitStats } from '../types'
 
 const GIF_W = 700
 const GIF_H = 440
-const CARD_H = 105
+const CARD_H = 108
 const FPS = 10
 const DURATION_MS = 3500
 const FRAME_COUNT = Math.round((FPS * DURATION_MS) / 1000) // 35
@@ -28,23 +28,36 @@ function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats) {
   const cardH = CARD_H - pad * 2
 
   const cards = [
-    { label: 'COUNTRIES VISITED', value: String(stats.countriesVisited), sub: `${stats.totalPhotos} photos` },
+    {
+      label: 'COUNTRIES VISITED',
+      value: String(stats.countriesVisited),
+      sub: `${stats.totalPhotos} photo${stats.totalPhotos !== 1 ? 's' : ''}`,
+    },
     {
       label: 'MOST VISITED',
       value: stats.mostVisitedCountry || '—',
-      sub: stats.mostVisitedCountry ? `${stats.mostVisitedVisits} trip${stats.mostVisitedVisits !== 1 ? 's' : ''}` : '',
+      sub: stats.mostVisitedCountry
+        ? `${stats.mostVisitedVisits} trip${stats.mostVisitedVisits !== 1 ? 's' : ''}`
+        : '',
     },
-    { label: 'COUNTRY OF ORIGIN', value: stats.originCountry, sub: '' },
+    {
+      label: 'COUNTRY OF ORIGIN',
+      value: stats.originCountry,
+      sub: '',
+    },
   ]
 
   cards.forEach((card, i) => {
     const x = pad + i * (cardW + pad)
     const y = pad
 
-    ctx.fillStyle = 'rgba(22, 28, 72, 0.96)'
+    // Card background
+    ctx.fillStyle = 'rgba(22, 28, 72, 0.97)'
     roundRect(ctx, x, y, cardW, cardH, 8)
     ctx.fill()
-    ctx.strokeStyle = 'rgba(99, 120, 220, 0.35)'
+
+    // Card border
+    ctx.strokeStyle = 'rgba(99, 120, 220, 0.40)'
     ctx.lineWidth = 1
     roundRect(ctx, x, y, cardW, cardH, 8)
     ctx.stroke()
@@ -52,17 +65,17 @@ function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats) {
     const cx = x + cardW / 2
     ctx.textAlign = 'center'
 
-    // Value
-    const vFontSize = Math.min(22, Math.max(12, Math.floor(cardW / Math.max(card.value.length, 1) * 1.1)))
+    // Main value — auto-size font
+    const fontSize = Math.min(24, Math.max(13, Math.floor((cardW - 20) / Math.max(card.value.length, 1) * 1.3)))
     ctx.fillStyle = '#ffffff'
-    ctx.font = `bold ${vFontSize}px sans-serif`
-    ctx.fillText(card.value, cx, y + cardH * 0.54, cardW - 16)
+    ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+    ctx.fillText(card.value, cx, y + cardH * 0.53, cardW - 16)
 
-    // Sub
+    // Sub line
     if (card.sub) {
-      ctx.fillStyle = 'rgba(160, 180, 240, 0.85)'
+      ctx.fillStyle = 'rgba(160, 180, 240, 0.9)'
       ctx.font = '10px sans-serif'
-      ctx.fillText(card.sub, cx, y + cardH * 0.76)
+      ctx.fillText(card.sub, cx, y + cardH * 0.75)
     }
 
     // Label
@@ -72,6 +85,11 @@ function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats) {
 
     ctx.textAlign = 'left'
   })
+}
+
+// Wait for the next rendered animation frame
+function nextFrame(): Promise<void> {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()))
 }
 
 export async function exportTravelGIF(
@@ -89,7 +107,15 @@ export async function exportTravelGIF(
   const frames: Uint8ClampedArray[] = []
 
   for (let i = 0; i < FRAME_COUNT; i++) {
-    await new Promise(r => setTimeout(r, captureInterval))
+    // Wait for a rendered WebGL frame before capturing
+    // Double-RAF ensures Three.js has completed its render call
+    await nextFrame()
+    await nextFrame()
+
+    // Also spread captures over the duration so arcs animate visibly
+    if (i > 0) {
+      await new Promise(r => setTimeout(r, captureInterval * 0.7))
+    }
 
     // Background gradient
     const grad = ctx.createLinearGradient(0, 0, 0, GIF_H)
@@ -98,10 +124,10 @@ export async function exportTravelGIF(
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, GIF_W, GIF_H)
 
-    // Cards
+    // Stats cards
     drawCards(ctx, stats)
 
-    // Globe
+    // Globe canvas — centered below cards
     const gY = CARD_H + 4
     const avW = GIF_W - 16
     const avH = GIF_H - gY - 8
@@ -109,10 +135,16 @@ export async function exportTravelGIF(
     const gW = webglCanvas.width * scale
     const gH = webglCanvas.height * scale
     const gX = (GIF_W - gW) / 2
+
+    ctx.save()
+    // Clip to a rounded rect for a cleaner look
+    roundRect(ctx, gX - 2, gY + (avH - gH) / 2 - 2, gW + 4, gH + 4, 200)
+    ctx.clip()
     ctx.drawImage(webglCanvas, gX, gY + (avH - gH) / 2, gW, gH)
+    ctx.restore()
 
     // Watermark
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'
     ctx.font = '9px sans-serif'
     ctx.textAlign = 'right'
     ctx.fillText('My Travel Map', GIF_W - 8, GIF_H - 6)
@@ -122,7 +154,7 @@ export async function exportTravelGIF(
     onProgress((i + 1) / FRAME_COUNT)
   }
 
-  // Encode
+  // Encode all frames as GIF
   const enc = GIFEncoder()
   for (const data of frames) {
     const palette = quantize(data, 256)
