@@ -31,6 +31,24 @@ export async function extractExif(file: File): Promise<ExifResult> {
       longitude = v
     }
 
+    // XMP GPSCoordinates: "14.2912 N, 121.0683 E"  (some Xiaomi / Sony cameras)
+    if (latitude == null && data.GPSCoordinates) {
+      const m = String(data.GPSCoordinates).match(/([0-9.]+)\s*([NS]),?\s*([0-9.]+)\s*([EW])/i)
+      if (m) {
+        latitude  = parseFloat(m[1]) * (m[2].toUpperCase() === 'S' ? -1 : 1)
+        longitude = parseFloat(m[3]) * (m[4].toUpperCase() === 'W' ? -1 : 1)
+      }
+    }
+
+    // XMP GPSPosition / exif:GPSPosition: "14.291200, 121.068300"
+    if (latitude == null && data.GPSPosition) {
+      const parts = String(data.GPSPosition).split(',').map((s: string) => parseFloat(s.trim()))
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        latitude  = parts[0]
+        longitude = parts[1]
+      }
+    }
+
     let datetime: Date | null = null
     const raw = data.DateTimeOriginal ?? data.CreateDate ?? data.DateTime
     if (raw) {
