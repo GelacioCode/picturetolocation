@@ -12,6 +12,7 @@
   --text-muted: rgba(26, 26, 62, 0.45);
   --text-sub: rgba(26, 26, 62, 0.60);
   --globe-bg: #07071a;
+  --popover-bg: rgb(240, 243, 255);   /* solid for readable popovers */
 }
 
 .dark {
@@ -23,6 +24,7 @@
   --text-muted: rgba(255, 255, 255, 0.35);
   --text-sub: rgba(160, 180, 240, 0.85);
   --globe-bg: #07071a;
+  --popover-bg: rgb(14, 15, 50);      /* solid dark navy */
 }
 
 * { box-sizing: border-box; }

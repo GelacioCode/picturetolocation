@@ -20,6 +20,7 @@ export interface GlobeHandle {
   stopArcs: () => void
   getCanvas: () => HTMLCanvasElement | null
   resetView: () => void
+  focusCountry: (lat: number, lng: number) => void
 }
 
 // Stable renderer config — must not be recreated each render
@@ -102,6 +103,9 @@ const GlobeView = forwardRef<GlobeHandle, Props>((props, ref) => {
     getCanvas() { return globeRef.current?.renderer()?.domElement ?? null },
     resetView() {
       globeRef.current?.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 1000)
+    },
+    focusCountry(lat, lng) {
+      globeRef.current?.pointOfView({ lat, lng, altitude: 1.1 }, 1200)
     },
   }))
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { MdDarkMode, MdLightMode } from 'react-icons/md'
+import { MdDarkMode, MdLightMode, MdMap, MdPublic } from 'react-icons/md'
 import { usePhotos } from './hooks/usePhotos'
 import StatsCards from './components/StatsCards'
 import GlobeView, { GlobeHandle } from './components/GlobeView'
@@ -28,30 +28,43 @@ export default function App() {
   } = usePhotos()
 
   const globeRef = useRef<GlobeHandle>(null)
-  const [showUpload, setShowUpload]     = useState(false)
+  const [showUpload, setShowUpload]       = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
-  const [isRecording, setIsRecording]   = useState(false)
+  const [isRecording, setIsRecording]     = useState(false)
 
-  // ── View mode: null = globe, string = country map ────────
+  // ── View mode ────────────────────────────────────────────
+  // null = full globe  |  string = focused on this country
   const [mapCountryCode, setMapCountryCode] = useState<string | null>(null)
+  // When a country is focused: 'map' = Leaflet flat  |  '3d' = globe zoomed in
+  const [countryViewType, setCountryViewType] = useState<'map' | '3d'>('map')
 
-  // If all photos are from a single country, force map view for that country.
-  // If the user manually selects a country (or clears it), that wins.
-  const forcedSingleCountry = useMemo(
+  // If all photos are from one country, force that country's view
+  const forcedSingle = useMemo(
     () => (uniqueCountries.length === 1 ? uniqueCountries[0] : null),
     [uniqueCountries],
   )
+  const effectiveMapCode = forcedSingle?.code ?? mapCountryCode
 
-  // Effective country being shown on map (forced or user-selected)
-  const effectiveMapCode = forcedSingleCountry?.code ?? mapCountryCode
+  // Reset sub-view to flat map whenever the focused country changes
+  useEffect(() => { setCountryViewType('map') }, [effectiveMapCode])
 
-  // Photos visible in the current map view
+  // Photos for the currently focused country
   const mapPhotos = useMemo(
     () => (effectiveMapCode ? photos.filter(p => p.countryCode === effectiveMapCode) : []),
     [photos, effectiveMapCode],
   )
 
-  const viewMode = effectiveMapCode ? 'map' : 'globe'
+  // Centroid of the focused country's photos (used for globe zoom)
+  const mapCentroid = useMemo(() => {
+    if (!mapPhotos.length) return null
+    return {
+      lat: mapPhotos.reduce((s, p) => s + p.lat, 0) / mapPhotos.length,
+      lng: mapPhotos.reduce((s, p) => s + p.lng, 0) / mapPhotos.length,
+    }
+  }, [mapPhotos])
+
+  const showGlobe = !effectiveMapCode || countryViewType === '3d'
+  const showMap   = !!effectiveMapCode && countryViewType === 'map'
 
   const showOrigin = !loading && !origin
 
@@ -66,6 +79,22 @@ export default function App() {
         </div>
       </div>
     )
+  }
+
+  function handleSwitch3D() {
+    setCountryViewType('3d')
+    // Globe may not be mounted yet — give it 2 frames to initialize
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (mapCentroid) globeRef.current?.focusCountry(mapCentroid.lat, mapCentroid.lng)
+      }),
+    )
+  }
+
+  function handleSwitchMap() {
+    // Reset globe view so switching back to full globe looks right
+    if (countryViewType === '3d') globeRef.current?.resetView()
+    setCountryViewType('map')
   }
 
   return (
@@ -120,7 +149,7 @@ export default function App() {
           destinationPoints={destinationPoints}
           uniqueCountries={uniqueCountries}
           photos={photos}
-          viewMode={viewMode}
+          viewMode={effectiveMapCode ? 'map' : 'globe'}
           effectiveMapCode={effectiveMapCode}
           onRecordingChange={setIsRecording}
         />
@@ -131,12 +160,13 @@ export default function App() {
         <StatsCards stats={stats} onUploadClick={() => setShowUpload(true)} />
       </div>
 
-      {/* ── Globe or Country Map ─────────────────────────── */}
+      {/* ── Main view: Globe or Country Map ──────────────── */}
       <div
         className="flex-1 min-h-0 relative rounded-t-2xl overflow-hidden"
         style={{ background: '#07071a' }}
       >
-        {viewMode === 'globe' ? (
+        {/* Globe (shown in full-globe mode OR in 3D country mode) */}
+        {showGlobe && (
           <GlobeView
             ref={globeRef}
             photos={photos}
@@ -148,21 +178,58 @@ export default function App() {
             onPhotoClick={setSelectedPhoto}
             isRecording={isRecording}
           />
-        ) : (
+        )}
+
+        {/* Flat Leaflet map (shown in country map mode) */}
+        {showMap && (
           <CountryMapView
             photos={mapPhotos}
             onPhotoClick={setSelectedPhoto}
           />
         )}
+
+        {/* ── Map / 3D toggle (only when a country is focused) ── */}
+        {effectiveMapCode && (
+          <div
+            className="absolute top-3 right-3 z-10 flex gap-0.5 p-0.5 rounded-xl"
+            style={{ background: 'rgba(0,0,0,0.50)', backdropFilter: 'blur(8px)' }}
+          >
+            <button
+              onClick={handleSwitchMap}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                         transition-all touch-manipulation"
+              style={countryViewType === 'map'
+                ? { background: 'rgba(52,211,153,0.3)', color: '#34d399' }
+                : { color: 'rgba(255,255,255,0.5)' }}
+              title="Flat map view"
+            >
+              <MdMap size={13} /> Map
+            </button>
+            <button
+              onClick={handleSwitch3D}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                         transition-all touch-manipulation"
+              style={countryViewType === '3d'
+                ? { background: 'rgba(52,211,153,0.3)', color: '#34d399' }
+                : { color: 'rgba(255,255,255,0.5)' }}
+              title="3D globe view"
+            >
+              <MdPublic size={13} /> 3D
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Country picker bar (bottom) ──────────────────── */}
-      {/*  Show only when multiple countries exist AND not forced-single */}
       {uniqueCountries.length > 1 && (
         <CountryPicker
           countries={uniqueCountries}
           selected={mapCountryCode}
-          onSelect={setMapCountryCode}
+          onSelect={code => {
+            // If deselecting → reset globe to full view
+            if (!code) globeRef.current?.resetView()
+            setMapCountryCode(code)
+          }}
         />
       )}
 

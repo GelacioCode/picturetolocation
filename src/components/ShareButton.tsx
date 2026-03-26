@@ -182,8 +182,9 @@ export default function ShareButton({
             <div
               className="absolute right-0 top-full mt-2 z-50 rounded-2xl shadow-2xl overflow-hidden"
               style={{
-                background: 'var(--card-bg)',
+                background: 'var(--popover-bg)',
                 border: '1px solid var(--card-border)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
                 minWidth: 220,
               }}
             >

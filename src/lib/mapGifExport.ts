@@ -8,7 +8,7 @@ const FPS    = 12
 const DURATION_MS = 4000
 const FRAME_COUNT = Math.round((FPS * DURATION_MS) / 1000)
 
-// ── Shared canvas helpers ─────────────────────────────────────
+// ── Canvas helpers ────────────────────────────────────────────
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number, r: number,
@@ -60,30 +60,71 @@ function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats) {
     roundRect(ctx, x, y, cardW, cardH, 8)
     ctx.stroke()
 
-    const cx = x + cardW / 2
+    const cx2 = x + cardW / 2
     ctx.textAlign = 'center'
 
     const fontSize = Math.min(24, Math.max(13, Math.floor((cardW - 20) / Math.max(card.value.length, 1) * 1.3)))
     ctx.fillStyle = '#ffffff'
     ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
-    ctx.fillText(card.value, cx, y + cardH * 0.53, cardW - 16)
+    ctx.fillText(card.value, cx2, y + cardH * 0.53, cardW - 16)
 
     if (card.sub) {
       ctx.fillStyle = 'rgba(160,180,240,0.9)'
       ctx.font = '10px sans-serif'
-      ctx.fillText(card.sub, cx, y + cardH * 0.75)
+      ctx.fillText(card.sub, cx2, y + cardH * 0.75)
     }
 
     ctx.fillStyle = 'rgba(100,120,190,0.75)'
     ctx.font = '9px sans-serif'
-    ctx.fillText(card.label, cx, y + cardH * 0.92)
+    ctx.fillText(card.label, cx2, y + cardH * 0.92)
     ctx.textAlign = 'left'
   })
 }
 
+// ── Animated arc (quadratic bezier, draws up to t=0..1) ──────
+function drawArc(
+  ctx: CanvasRenderingContext2D,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  t: number,
+) {
+  if (t <= 0) return
+
+  // Control point: above the midpoint — creates a nice upward curve
+  const mx  = (x1 + x2) / 2
+  const my  = (y1 + y2) / 2
+  const dx  = x2 - x1
+  const dy  = y2 - y1
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  // Perpendicular, pointing "up" on screen (negative y = up)
+  const cpx = mx + (dy / len) * Math.min(len * 0.35, 60)
+  const cpy = my - (dx / len) * Math.min(len * 0.35, 60) - len * 0.1
+
+  // Draw partial bezier up to t
+  const steps = Math.max(6, Math.round(50 * t))
+  ctx.beginPath()
+  for (let i = 0; i <= steps; i++) {
+    const p  = (i / steps) * t
+    const bx = (1 - p) * (1 - p) * x1 + 2 * (1 - p) * p * cpx + p * p * x2
+    const by = (1 - p) * (1 - p) * y1 + 2 * (1 - p) * p * cpy + p * p * y2
+    if (i === 0) ctx.moveTo(bx, by); else ctx.lineTo(bx, by)
+  }
+  ctx.strokeStyle = 'rgba(245,158,11,0.80)'
+  ctx.lineWidth   = 1.8
+  ctx.stroke()
+
+  // Airplane dot at the tip of the arc
+  const tipX = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cpx + t * t * x2
+  const tipY = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cpy + t * t * y2
+  ctx.beginPath()
+  ctx.arc(tipX, tipY, 4, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(245,158,11,0.95)'
+  ctx.fill()
+}
+
 // ── GeoJSON cache ─────────────────────────────────────────────
 let geoCache: any = null
-async function getGeoJSON(): Promise<any> {
+async function getGeoJSON() {
   if (geoCache) return geoCache
   const r = await fetch(
     'https://raw.githubusercontent.com/vasturiano/globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson',
@@ -92,21 +133,21 @@ async function getGeoJSON(): Promise<any> {
   return geoCache
 }
 
-// ── Simple equirectangular projection ────────────────────────
+// ── Equirectangular projection ────────────────────────────────
 function makeProject(
   west: number, east: number, south: number, north: number,
   W: number, H: number,
-  offsetX: number, offsetY: number,
+  offX: number, offY: number,
 ) {
-  const lngSpan = east - west || 0.001
+  const lngSpan = east  - west  || 0.001
   const latSpan = north - south || 0.001
   return (lng: number, lat: number): [number, number] => [
-    offsetX + ((lng - west) / lngSpan) * W,
-    offsetY + ((north - lat) / latSpan) * H,
+    offX + ((lng - west)  / lngSpan) * W,
+    offY + ((north - lat) / latSpan) * H,
   ]
 }
 
-// Draw a GeoJSON Polygon / MultiPolygon onto a canvas path
+// Draw a GeoJSON Polygon/MultiPolygon onto a canvas path
 function geoPath(
   ctx: CanvasRenderingContext2D,
   feature: any,
@@ -116,7 +157,7 @@ function geoPath(
   if (!g) return
   const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
   ctx.beginPath()
-  for (const poly of polys) {
+  for (const poly of polys)
     for (const ring of poly) {
       ring.forEach(([lng, lat]: [number, number], i: number) => {
         const [x, y] = project(lng, lat)
@@ -124,20 +165,17 @@ function geoPath(
       })
       ctx.closePath()
     }
-  }
 }
 
-// Preload an image from a data URL
 function loadImg(src: string): Promise<HTMLImageElement> {
   return new Promise(res => {
     const img = new Image()
-    img.onload  = () => res(img)
-    img.onerror = () => res(img)
-    img.src     = src
+    img.onload = img.onerror = () => res(img)
+    img.src = src
   })
 }
 
-// ── Main export ──────────────────────────────────────────────
+// ── Main export ───────────────────────────────────────────────
 export async function exportMapGIF(
   photos: Photo[],
   countryCode: string,
@@ -148,15 +186,12 @@ export async function exportMapGIF(
   if (photos.length === 0) throw new Error('No photos to export')
 
   const geoJSON = await getGeoJSON()
-
-  // Features for the target country
   const targetFeats = (geoJSON.features as any[]).filter(
     f => f.properties?.ISO_A2 === countryCode,
   )
 
-  // Bounding box: start with photo coordinates, expand with country GeoJSON
+  // Bounding box from photos + GeoJSON features
   let [minLat, maxLat, minLng, maxLng] = [Infinity, -Infinity, Infinity, -Infinity]
-
   for (const p of photos) {
     minLat = Math.min(minLat, p.lat);  maxLat = Math.max(maxLat, p.lat)
     minLng = Math.min(minLng, p.lng);  maxLng = Math.max(maxLng, p.lng)
@@ -170,12 +205,10 @@ export async function exportMapGIF(
     }
   }
 
-  // Add 15% padding around bounding box
   const pLng = Math.max((maxLng - minLng) * 0.15, 1.5)
   const pLat = Math.max((maxLat - minLat) * 0.15, 1.5)
   const [west, east, south, north] = [minLng - pLng, maxLng + pLng, minLat - pLat, maxLat + pLat]
 
-  // Map canvas area (below stats cards when stats available)
   const hasStats = !!stats
   const mapTop  = hasStats ? CARD_H + 6 : 8
   const mapLeft = 8
@@ -184,28 +217,35 @@ export async function exportMapGIF(
 
   const project = makeProject(west, east, south, north, mapW, mapH, mapLeft, mapTop)
 
+  // Arc origin: use stats origin if available, else centroid of photos
+  const originLat = stats?.originLat ?? photos.reduce((s, p) => s + p.lat, 0) / photos.length
+  const originLng = stats?.originLng ?? photos.reduce((s, p) => s + p.lng, 0) / photos.length
+
   // Preload thumbnails
   const thumbs = new Map<string, HTMLImageElement>()
   await Promise.all(photos.map(async p => { thumbs.set(p.id, await loadImg(p.thumbnailDataUrl)) }))
 
   const comp = document.createElement('canvas')
-  comp.width  = GIF_W
-  comp.height = GIF_H
-  const ctx   = comp.getContext('2d')!
+  comp.width = GIF_W; comp.height = GIF_H
+  const ctx  = comp.getContext('2d')!
 
-  const frameDelay  = Math.round(1000 / FPS)
-  const revealEnd   = Math.floor(FRAME_COUNT * 0.45)  // pins reveal over first 45% of frames
+  // Animation phases (in frames):
+  //  0 → arcEnd  : arcs fly from origin to all destinations simultaneously
+  //  arcEnd → end: everything holds static
+  const arcEnd   = Math.floor(FRAME_COUNT * 0.55) // ~60% for arc animation
+  const frameDelay = Math.round(1000 / FPS)
   const frames: Uint8ClampedArray[] = []
 
   for (let i = 0; i < FRAME_COUNT; i++) {
-    // ── Background ───────────────────────────────────────────
+    const arcT = i < arcEnd ? (i + 1) / arcEnd : 1.0  // 0→1 over first 55% of frames
+
+    // ── Background ─────────────────────────────────────────
     const bg = ctx.createLinearGradient(0, 0, 0, GIF_H)
-    bg.addColorStop(0, '#07071a')
-    bg.addColorStop(1, '#0d0d2b')
+    bg.addColorStop(0, '#07071a'); bg.addColorStop(1, '#0d0d2b')
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, GIF_W, GIF_H)
 
-    // ── Stats cards ──────────────────────────────────────────
+    // ── Stats cards ─────────────────────────────────────────
     if (hasStats) drawCards(ctx, stats!)
 
     // ── Map area background ──────────────────────────────────
@@ -213,89 +253,97 @@ export async function exportMapGIF(
     roundRect(ctx, mapLeft, mapTop, mapW, mapH, 12)
     ctx.fill()
 
-    // Clip all map content to the rounded rectangle
+    // Clip all map drawing to rounded rect
     ctx.save()
     roundRect(ctx, mapLeft, mapTop, mapW, mapH, 12)
     ctx.clip()
 
-    // Draw surrounding countries (very faint, skip target)
+    // Surrounding countries (faint)
     for (const f of geoJSON.features as any[]) {
       if (f.properties?.ISO_A2 === countryCode) continue
       ctx.fillStyle   = 'rgba(28,36,80,0.55)'
-      ctx.strokeStyle = 'rgba(55,75,140,0.30)'
+      ctx.strokeStyle = 'rgba(55,75,140,0.28)'
       ctx.lineWidth   = 0.5
       geoPath(ctx, f, project)
-      ctx.fill()
-      ctx.stroke()
+      ctx.fill(); ctx.stroke()
     }
 
-    // Draw target country (highlighted teal)
+    // Target country (highlighted teal)
     for (const f of targetFeats) {
       ctx.fillStyle   = 'rgba(52,211,153,0.22)'
       ctx.strokeStyle = 'rgba(52,211,153,0.85)'
       ctx.lineWidth   = 1.8
       geoPath(ctx, f, project)
-      ctx.fill()
-      ctx.stroke()
+      ctx.fill(); ctx.stroke()
     }
 
     ctx.restore()
 
-    // ── Photo pins (reveal animation) ───────────────────────
-    const pinsVisible = i < revealEnd
-      ? Math.ceil(photos.length * ((i + 1) / revealEnd))
-      : photos.length
+    // ── Airplane arcs (origin → each photo) ────────────────
+    const [ox, oy] = project(originLng, originLat)
+    for (const photo of photos) {
+      const [px, py] = project(photo.lng, photo.lat)
+      drawArc(ctx, ox, oy, px, py, arcT)
+    }
 
-    for (let pi = 0; pi < pinsVisible; pi++) {
-      const photo = photos[pi]
-      const [cx, cy] = project(photo.lng, photo.lat)
-      const r = 20
+    // ── Origin dot ─────────────────────────────────────────
+    ctx.beginPath()
+    ctx.arc(ox, oy, 5, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(239,68,68,0.95)'
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(ox, oy, 8, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(239,68,68,0.40)'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
 
-      // Clip to circle and draw thumbnail
+    // ── Photo pins (always visible) ─────────────────────────
+    for (const photo of photos) {
+      const [px, py] = project(photo.lng, photo.lat)
+      const r = 18
+
       ctx.save()
       ctx.beginPath()
-      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.arc(px, py, r, 0, Math.PI * 2)
       ctx.clip()
       const img = thumbs.get(photo.id)
       if (img?.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2)
+        ctx.drawImage(img, px - r, py - r, r * 2, r * 2)
       } else {
         ctx.fillStyle = 'rgba(99,102,241,0.6)'
         ctx.fill()
       }
       ctx.restore()
 
-      // White border ring
+      // White border
       ctx.beginPath()
-      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.arc(px, py, r, 0, Math.PI * 2)
       ctx.strokeStyle = 'rgba(255,255,255,0.88)'
       ctx.lineWidth = 2.5
       ctx.stroke()
 
       // Indigo glow
       ctx.beginPath()
-      ctx.arc(cx, cy, r + 4, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(99,102,241,0.38)'
+      ctx.arc(px, py, r + 4, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(99,102,241,0.35)'
       ctx.lineWidth = 2
       ctx.stroke()
     }
 
-    // ── Labels ───────────────────────────────────────────────
+    // ── Labels ─────────────────────────────────────────────
     ctx.fillStyle = 'rgba(255,255,255,0.65)'
-    ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.font      = 'bold 13px -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textAlign = 'right'
     ctx.fillText(countryName, GIF_W - 10, GIF_H - 8)
 
     ctx.fillStyle = 'rgba(255,255,255,0.22)'
-    ctx.font = '9px sans-serif'
+    ctx.font      = '9px sans-serif'
     ctx.textAlign = 'left'
     ctx.fillText('My Travel Map', 10, GIF_H - 8)
-    ctx.textAlign = 'left'
 
     frames.push(new Uint8ClampedArray(ctx.getImageData(0, 0, GIF_W, GIF_H).data))
     onProgress((i + 1) / FRAME_COUNT)
 
-    // Yield so the browser stays responsive
     if (i % 4 === 0) await new Promise(r => setTimeout(r, 0))
   }
 
