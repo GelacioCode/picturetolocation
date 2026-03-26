@@ -13,14 +13,25 @@ async function getGeoJSON() {
   return geoCache
 }
 
-// Centered equirectangular projection → Three.js XY coordinates (~0.9 units wide)
+// Try multiple property fields to find the right country feature
+function matchesCountry(f: any, code: string): boolean {
+  const p = f.properties
+  if (!p) return false
+  return (
+    p.ISO_A2 === code ||
+    p.ISO_A2_EH === code ||
+    p.WB_A2 === code
+  )
+}
+
+// Centered equirectangular projection → Three.js XY coordinates
 function makeProject(west: number, east: number, south: number, north: number) {
   const maxSpan = Math.max(east - west, north - south) || 0.001
   const cLng = (west + east) / 2
   const cLat = (south + north) / 2
   return (lng: number, lat: number): [number, number] => [
-    ((lng - cLng) / maxSpan) * 0.9,
-    ((lat - cLat) / maxSpan) * 0.9,
+    ((lng - cLng) / maxSpan) * 0.85,
+    ((lat - cLat) / maxSpan) * 0.85,
   ]
 }
 
@@ -33,21 +44,22 @@ function createPinSprite(dataUrl: string): Promise<THREE.Sprite> {
     const ctx = canvas.getContext('2d')!
 
     function finish() {
+      // White ring
       ctx.beginPath()
       ctx.arc(S / 2, S / 2, S / 2 - 8, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(255,255,255,0.92)'
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)'
       ctx.lineWidth = 7
       ctx.stroke()
-      // Indigo outer glow
+      // Teal outer glow ring
       ctx.beginPath()
       ctx.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(99,102,241,0.5)'
-      ctx.lineWidth = 4
+      ctx.strokeStyle = 'rgba(52,211,153,0.7)'
+      ctx.lineWidth = 5
       ctx.stroke()
       const tex = new THREE.CanvasTexture(canvas)
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
       const sprite = new THREE.Sprite(mat)
-      sprite.scale.set(0.11, 0.11, 1)
+      sprite.scale.set(0.13, 0.13, 1)
       resolve(sprite)
     }
 
@@ -90,9 +102,15 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
     let animId = 0
 
     // ── Renderer ────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setClearColor(0x06061a)
     container.appendChild(renderer.domElement)
+
+    // ── Camera ───────────────────────────────────────────────
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100)
+    camera.position.set(0, -0.08, 1.9)
+    camera.lookAt(0, 0.05, 0)
 
     const setSize = () => {
       const w = container.clientWidth
@@ -102,32 +120,27 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
       camera.updateProjectionMatrix()
     }
 
-    // ── Camera ───────────────────────────────────────────────
-    const camera = new THREE.PerspectiveCamera(48, 1, 0.01, 100)
-    camera.position.set(0, -0.10, 2.0)
-    camera.lookAt(0, 0.05, 0)
-
     // ── Scene ────────────────────────────────────────────────
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x07071a)
 
     // ── Lights ──────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x304070, 2.2))
-    const dirLight = new THREE.DirectionalLight(0x88aaff, 2.8)
-    dirLight.position.set(1, 1.5, 3)
+    scene.add(new THREE.AmbientLight(0x2040a0, 3.0))
+    const dirLight = new THREE.DirectionalLight(0x8899ff, 3.5)
+    dirLight.position.set(2, 2, 4)
     scene.add(dirLight)
 
     // ── Background stars ────────────────────────────────────
-    const starPos = new Float32Array(300 * 3)
-    for (let i = 0; i < 300; i++) {
-      starPos[i * 3]     = (Math.random() - 0.5) * 6
-      starPos[i * 3 + 1] = (Math.random() - 0.5) * 6
-      starPos[i * 3 + 2] = -1
+    const starCount = 400
+    const starPos = new Float32Array(starCount * 3)
+    for (let i = 0; i < starCount; i++) {
+      starPos[i * 3]     = (Math.random() - 0.5) * 8
+      starPos[i * 3 + 1] = (Math.random() - 0.5) * 8
+      starPos[i * 3 + 2] = -2
     }
     const starGeo = new THREE.BufferGeometry()
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
     scene.add(new THREE.Points(starGeo,
-      new THREE.PointsMaterial({ color: 0xffffff, size: 0.007, transparent: true, opacity: 0.45 }),
+      new THREE.PointsMaterial({ color: 0xffffff, size: 0.009, transparent: true, opacity: 0.6 }),
     ))
 
     // ── Raycaster for pin clicks ─────────────────────────────
@@ -153,6 +166,9 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
     ro.observe(container)
     setSize()
 
+    // ── Pulsing blob meshes (animated) ───────────────────────
+    const pulseMeshes: THREE.Mesh[] = []
+
     // ── Load GeoJSON + pin sprites async ────────────────────
     Promise.all([
       getGeoJSON(),
@@ -161,10 +177,10 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
       )),
     ]).then(([geo, pins]) => {
       const targetFeats = (geo.features as any[]).filter(
-        (f: any) => f.properties?.ISO_A2 === countryCode,
+        (f: any) => matchesCountry(f, countryCode),
       )
 
-      // Compute bounding box
+      // Compute bounding box from GeoJSON + photo coords
       let [minLat, maxLat, minLng, maxLng] = [Infinity, -Infinity, Infinity, -Infinity]
       for (const ph of photos) {
         minLat = Math.min(minLat, ph.lat); maxLat = Math.max(maxLat, ph.lat)
@@ -181,13 +197,13 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
       }
       if (!isFinite(minLat)) { minLat = -10; maxLat = 10; minLng = -10; maxLng = 10 }
 
-      const pLng = Math.max((maxLng - minLng) * 0.12, 1.5)
-      const pLat = Math.max((maxLat - minLat) * 0.12, 1.5)
+      const pLng = Math.max((maxLng - minLng) * 0.14, 2)
+      const pLat = Math.max((maxLat - minLat) * 0.14, 2)
       const project = makeProject(minLng - pLng, maxLng + pLng, minLat - pLat, maxLat + pLat)
 
-      // ── Surrounding countries (faint navy) ────────────────
+      // ── Surrounding countries (very dim) ──────────────────
       for (const f of geo.features as any[]) {
-        if (f.properties?.ISO_A2 === countryCode) continue
+        if (matchesCountry(f, countryCode)) continue
         const g = f.geometry
         if (!g) continue
         const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
@@ -199,14 +215,24 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
           })
           const mesh = new THREE.Mesh(
             new THREE.ShapeGeometry(shape),
-            new THREE.MeshLambertMaterial({ color: 0x1a2258, transparent: true, opacity: 0.50, depthWrite: false }),
+            new THREE.MeshBasicMaterial({ color: 0x0d1240, transparent: true, opacity: 0.65, depthWrite: false }),
           )
-          mesh.position.z = -0.005
+          mesh.position.z = -0.006
           scene.add(mesh)
+
+          // Faint border for surrounding countries
+          const pts2 = shape.extractPoints(4).shape
+          if (pts2.length > 1) {
+            const verts2 = [...pts2, pts2[0]].map(p => new THREE.Vector3(p.x, p.y, -0.003))
+            scene.add(new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints(verts2),
+              new THREE.LineBasicMaterial({ color: 0x1e2a6e, transparent: true, opacity: 0.5 }),
+            ))
+          }
         }
       }
 
-      // ── Target country: fill + border + glow ─────────────
+      // ── Target country: deep indigo fill + bright border ──
       for (const f of targetFeats) {
         const g = f.geometry
         const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]
@@ -216,7 +242,6 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
             const [x, y] = project(lng, lat)
             if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y)
           })
-          // Holes
           for (let ri = 1; ri < poly.length; ri++) {
             const hole = new THREE.Path()
             ;(poly[ri] as [number, number][]).forEach(([lng, lat], i) => {
@@ -228,45 +253,78 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
 
           const fillGeo = new THREE.ShapeGeometry(shape)
 
-          // Main fill
+          // Deep blue-indigo base
           scene.add(new THREE.Mesh(fillGeo,
-            new THREE.MeshLambertMaterial({ color: 0x1d7a54, emissive: 0x0a3825, transparent: true, opacity: 0.88 }),
+            new THREE.MeshLambertMaterial({
+              color: 0x1a237e,
+              emissive: 0x283593,
+              transparent: true,
+              opacity: 0.95,
+            }),
           ))
 
-          // Emissive glow overlay
+          // Bright indigo overlay glow
           const glowMesh = new THREE.Mesh(fillGeo,
-            new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.09 }),
+            new THREE.MeshBasicMaterial({ color: 0x5c6bc0, transparent: true, opacity: 0.30 }),
           )
           glowMesh.position.z = 0.002
           scene.add(glowMesh)
 
-          // Bright border line
-          const pts = shape.extractPoints(8).shape
+          // Bright cyan/indigo border
+          const pts = shape.extractPoints(12).shape
           if (pts.length > 1) {
-            const verts = [...pts, pts[0]].map(p => new THREE.Vector3(p.x, p.y, 0.008))
+            const verts = [...pts, pts[0]].map(p => new THREE.Vector3(p.x, p.y, 0.01))
             scene.add(new THREE.Line(
               new THREE.BufferGeometry().setFromPoints(verts),
-              new THREE.LineBasicMaterial({ color: 0x34d399 }),
+              new THREE.LineBasicMaterial({ color: 0x818cf8 }),
             ))
           }
         }
       }
 
-      // ── Visited-area glow rings ───────────────────────────
+      // If no country found at all, just render pins and rings based on photo coords
+      // (project is still valid because we used photo bbox)
+
+      // ── Visited-area glowing blobs (per photo) ────────────
       for (const ph of photos) {
         const [x, y] = project(ph.lng, ph.lat)
-        const ringGeo = new THREE.RingGeometry(0.04, 0.065, 32)
-        scene.add(new THREE.Mesh(ringGeo,
-          new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.45, side: THREE.DoubleSide }),
-        ))
-        const ring = scene.children[scene.children.length - 1] as THREE.Mesh
-        ring.position.set(x, y, 0.012)
+
+        // Large outer halo (soft glow)
+        const haloGeo = new THREE.CircleGeometry(0.075, 32)
+        const haloMesh = new THREE.Mesh(haloGeo,
+          new THREE.MeshBasicMaterial({
+            color: 0x34d399,
+            transparent: true,
+            opacity: 0.18,
+          }),
+        )
+        haloMesh.position.set(x, y, 0.005)
+        scene.add(haloMesh)
+
+        // Medium bright disc
+        const discGeo = new THREE.CircleGeometry(0.045, 32)
+        const discMesh = new THREE.Mesh(discGeo,
+          new THREE.MeshBasicMaterial({
+            color: 0x34d399,
+            transparent: true,
+            opacity: 0.65,
+          }),
+        )
+        discMesh.position.set(x, y, 0.008)
+        scene.add(discMesh)
+        pulseMeshes.push(discMesh)
+
+        // Inner bright core
+        const coreGeo = new THREE.CircleGeometry(0.02, 32)
+        scene.add(Object.assign(new THREE.Mesh(coreGeo,
+          new THREE.MeshBasicMaterial({ color: 0xd1fae5, transparent: true, opacity: 0.9 }),
+        ), { position: new THREE.Vector3(x, y, 0.012) }))
       }
 
-      // ── Photo pin sprites ─────────────────────────────────
+      // ── Photo pin sprites (floating above blobs) ──────────
       for (const { sprite, photo: ph } of pins) {
         const [x, y] = project(ph.lng, ph.lat)
-        sprite.position.set(x, y, 0.06)
+        sprite.position.set(x, y, 0.08)
         scene.add(sprite)
         pinSprites.push({ sprite, photo: ph })
       }
@@ -275,9 +333,18 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
       let t = 0
       function animate() {
         animId = requestAnimationFrame(animate)
-        t += 0.006
-        dirLight.position.x = Math.cos(t) * 2.5
-        dirLight.position.y = Math.sin(t * 0.6) * 1.2 + 1.5
+        t += 0.018
+
+        // Slowly orbit directional light for subtle shimmer on indigo fill
+        dirLight.position.x = Math.cos(t * 0.3) * 3
+        dirLight.position.y = Math.sin(t * 0.2) * 1.5 + 2
+
+        // Pulse the visited-area discs
+        const pulse = 1 + Math.sin(t * 2.2) * 0.18
+        for (const m of pulseMeshes) {
+          m.scale.set(pulse, pulse, 1)
+        }
+
         renderer.render(scene, camera)
       }
       animate()
@@ -292,5 +359,5 @@ export default function CountryThreeView({ photos, countryCode, onPhotoClick }: 
     }
   }, [countryCode, photos])
 
-  return <div ref={containerRef} className="w-full h-full" style={{ background: '#07071a' }} />
+  return <div ref={containerRef} className="w-full h-full" style={{ background: '#06061a' }} />
 }
