@@ -4,7 +4,7 @@ import { usePhotos } from './hooks/usePhotos'
 import StatsCards from './components/StatsCards'
 import GlobeView, { GlobeHandle } from './components/GlobeView'
 import CountryMapView from './components/CountryMapView'
-import CountryThreeView from './components/CountryThreeView'
+import CountrySVGView from './components/CountrySVGView'
 import CountryPicker from './components/CountryPicker'
 import type { CountryOption } from './components/CountryPicker'
 import OriginModal from './components/OriginModal'
@@ -207,7 +207,7 @@ export default function App() {
 
         {/* Three.js 3D polygon map */}
         {showPolygon && effectiveMapCode && (
-          <CountryThreeView
+          <CountrySVGView
             photos={mapPhotos}
             countryCode={effectiveMapCode}
             onPhotoClick={setSelectedPhoto}
@@ -223,7 +223,7 @@ export default function App() {
             {(
               [
                 { type: 'map'     as CountryViewType, icon: <MdMap size={13} />,       label: 'Map'    },
-                { type: 'polygon' as CountryViewType, icon: <MdViewInAr size={13} />,  label: '3D Map' },
+                { type: 'polygon' as CountryViewType, icon: <MdViewInAr size={13} />,  label: 'Region' },
                 { type: '3d'      as CountryViewType, icon: <MdPublic size={13} />,    label: 'Globe'  },
               ] as const
             ).map(btn => (
@@ -293,8 +293,8 @@ export default function App() {
                 onClick={() => confirmView(pendingCountry, 'polygon')}
               >
                 <MdViewInAr size={22} style={{ color: '#34d399' }} />
-                3D Map
-                <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>Three.js polygon view</span>
+                Region Map
+                <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>SVG country outline</span>
               </button>
             </div>
           </div>
