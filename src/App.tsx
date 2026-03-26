@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { MdDarkMode, MdLightMode } from 'react-icons/md'
 import { usePhotos } from './hooks/usePhotos'
 import StatsCards from './components/StatsCards'
 import GlobeView, { GlobeHandle } from './components/GlobeView'
+import CountryMapView from './components/CountryMapView'
+import CountryPicker from './components/CountryPicker'
 import OriginModal from './components/OriginModal'
 import UploadModal from './components/UploadModal'
 import PhotoDetail from './components/PhotoDetail'
@@ -20,13 +22,36 @@ export default function App() {
   }, [theme])
 
   // ── Data ─────────────────────────────────────────────────
-  const { photos, origin, loading, stats, visitedCodes, destinationPoints,
-          addPhotos, removePhoto, setOrigin } = usePhotos()
+  const {
+    photos, origin, loading, stats, visitedCodes, uniqueCountries,
+    destinationPoints, addPhotos, removePhoto, setOrigin,
+  } = usePhotos()
 
   const globeRef = useRef<GlobeHandle>(null)
-  const [showUpload, setShowUpload] = useState(false)
+  const [showUpload, setShowUpload]     = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
+  const [isRecording, setIsRecording]   = useState(false)
+
+  // ── View mode: null = globe, string = country map ────────
+  const [mapCountryCode, setMapCountryCode] = useState<string | null>(null)
+
+  // If all photos are from a single country, force map view for that country.
+  // If the user manually selects a country (or clears it), that wins.
+  const forcedSingleCountry = useMemo(
+    () => (uniqueCountries.length === 1 ? uniqueCountries[0] : null),
+    [uniqueCountries],
+  )
+
+  // Effective country being shown on map (forced or user-selected)
+  const effectiveMapCode = forcedSingleCountry?.code ?? mapCountryCode
+
+  // Photos visible in the current map view
+  const mapPhotos = useMemo(
+    () => (effectiveMapCode ? photos.filter(p => p.countryCode === effectiveMapCode) : []),
+    [photos, effectiveMapCode],
+  )
+
+  const viewMode = effectiveMapCode ? 'map' : 'globe'
 
   const showOrigin = !loading && !origin
 
@@ -93,6 +118,10 @@ export default function App() {
           globeRef={globeRef}
           stats={stats}
           destinationPoints={destinationPoints}
+          uniqueCountries={uniqueCountries}
+          photos={photos}
+          viewMode={viewMode}
+          effectiveMapCode={effectiveMapCode}
           onRecordingChange={setIsRecording}
         />
       </header>
@@ -102,23 +131,40 @@ export default function App() {
         <StatsCards stats={stats} onUploadClick={() => setShowUpload(true)} />
       </div>
 
-      {/* ── Globe — always dark backdrop regardless of theme ── */}
+      {/* ── Globe or Country Map ─────────────────────────── */}
       <div
         className="flex-1 min-h-0 relative rounded-t-2xl overflow-hidden"
         style={{ background: '#07071a' }}
       >
-        <GlobeView
-          ref={globeRef}
-          photos={photos}
-          visitedCodes={visitedCodes}
-          originCode={origin?.code ?? null}
-          originLat={origin?.lat ?? null}
-          originLng={origin?.lng ?? null}
-          onUploadClick={() => setShowUpload(true)}
-          onPhotoClick={setSelectedPhoto}
-          isRecording={isRecording}
-        />
+        {viewMode === 'globe' ? (
+          <GlobeView
+            ref={globeRef}
+            photos={photos}
+            visitedCodes={visitedCodes}
+            originCode={origin?.code ?? null}
+            originLat={origin?.lat ?? null}
+            originLng={origin?.lng ?? null}
+            onUploadClick={() => setShowUpload(true)}
+            onPhotoClick={setSelectedPhoto}
+            isRecording={isRecording}
+          />
+        ) : (
+          <CountryMapView
+            photos={mapPhotos}
+            onPhotoClick={setSelectedPhoto}
+          />
+        )}
       </div>
+
+      {/* ── Country picker bar (bottom) ──────────────────── */}
+      {/*  Show only when multiple countries exist AND not forced-single */}
+      {uniqueCountries.length > 1 && (
+        <CountryPicker
+          countries={uniqueCountries}
+          selected={mapCountryCode}
+          onSelect={setMapCountryCode}
+        />
+      )}
 
       {/* ── Modals ────────────────────────────────────────── */}
       {showOrigin && <OriginModal onConfirm={(o: OriginCountry) => setOrigin(o)} />}

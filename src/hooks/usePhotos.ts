@@ -37,6 +37,15 @@ export function usePhotos() {
     [photos],
   )
 
+  // Deduplicated list of visited countries (code + name)
+  const uniqueCountries = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const p of photos) {
+      if (p.countryCode && !seen.has(p.countryCode)) seen.set(p.countryCode, p.country)
+    }
+    return Array.from(seen.entries()).map(([code, name]) => ({ code, name }))
+  }, [photos])
+
   // Destination centroids: average lat/lng per country
   const destinationPoints = useMemo(() => {
     const map = new Map<string, { lats: number[]; lngs: number[]; country: string }>()
@@ -100,5 +109,5 @@ export function usePhotos() {
     }
   }, [photos, origin])
 
-  return { photos, origin, loading, stats, visitedCodes, destinationPoints, addPhotos, removePhoto, setOrigin }
+  return { photos, origin, loading, stats, visitedCodes, uniqueCountries, destinationPoints, addPhotos, removePhoto, setOrigin }
 }
