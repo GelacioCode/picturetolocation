@@ -55,8 +55,12 @@ export default function App() {
     [effectiveMapCode, uniqueCountries],
   )
 
-  // Reset sub-view when focused country changes
-  useEffect(() => { setCountryViewType('map') }, [effectiveMapCode])
+  // Reset sub-view when focused country changes (skip if confirmView already set the type)
+  const skipResetRef = useRef(false)
+  useEffect(() => {
+    if (skipResetRef.current) { skipResetRef.current = false; return }
+    setCountryViewType('map')
+  }, [effectiveMapCode])
 
   // Photos for the currently focused country
   const mapPhotos = useMemo(
@@ -92,6 +96,7 @@ export default function App() {
   }
 
   function confirmView(country: CountryOption, viewType: CountryViewType) {
+    skipResetRef.current = true
     setMapCountryCode(country.code)
     setCountryViewType(viewType)
     setPendingCountry(null)
@@ -217,13 +222,13 @@ export default function App() {
         {/* ── Map / Polygon / 3D toggle ────────────────── */}
         {effectiveMapCode && (
           <div
-            className="absolute top-3 right-3 z-10 flex gap-0.5 p-0.5 rounded-xl"
-            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+            className="absolute top-3 right-3 flex gap-0.5 p-0.5 rounded-xl"
+            style={{ zIndex: 700, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}
           >
             {(
               [
                 { type: 'map'     as CountryViewType, icon: <MdMap size={13} />,       label: 'Map'    },
-                { type: 'polygon' as CountryViewType, icon: <MdViewInAr size={13} />,  label: 'Region' },
+                { type: 'polygon' as CountryViewType, icon: <MdViewInAr size={13} />,  label: 'SVG'    },
                 { type: '3d'      as CountryViewType, icon: <MdPublic size={13} />,    label: 'Globe'  },
               ] as const
             ).map(btn => (
@@ -239,7 +244,7 @@ export default function App() {
                 style={
                   countryViewType === btn.type
                     ? { background: 'rgba(52,211,153,0.30)', color: '#34d399' }
-                    : { color: 'rgba(255,255,255,0.50)' }
+                    : { color: 'rgba(255,255,255,0.65)' }
                 }
               >
                 {btn.icon} {btn.label}
@@ -283,7 +288,7 @@ export default function App() {
                 onClick={() => confirmView(pendingCountry, 'map')}
               >
                 <MdMap size={22} style={{ color: '#818cf8' }} />
-                Street Map
+                Country Map
                 <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>Zoomable OSM tiles</span>
               </button>
               <button
@@ -293,7 +298,7 @@ export default function App() {
                 onClick={() => confirmView(pendingCountry, 'polygon')}
               >
                 <MdViewInAr size={22} style={{ color: '#34d399' }} />
-                Region Map
+                SVG Map
                 <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>SVG country outline</span>
               </button>
             </div>
