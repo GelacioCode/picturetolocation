@@ -168,7 +168,8 @@ export default function UploadModal({ onClose, onPhotosAdded }: Props) {
   const [items, setItems] = useState<ProcessedImage[]>([])
   const [saving, setSaving] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const fileRef   = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
 
   const processFiles = useCallback(async (files: File[]) => {
     const imageFiles = files.filter(f => f.type.startsWith('image/'))
@@ -288,28 +289,33 @@ export default function UploadModal({ onClose, onPhotosAdded }: Props) {
           <button onClick={onClose} className="text-white/40 hover:text-white/80 text-xl leading-none">✕</button>
         </div>
 
-        {/* Drop zone */}
-        <div className="px-6 pt-4">
+        {/* Drop zone + action buttons */}
+        <div className="px-6 pt-4 flex flex-col gap-2">
           <div
-            className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all
+            className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all
               ${dragging ? 'dropzone-active' : 'border-white/15 hover:border-indigo-500/50'}`}
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
           >
-            <div className="text-3xl mb-2">📸</div>
-            <p className="text-white/60 text-sm">Drop photos here or <span className="text-indigo-400 underline">browse</span></p>
-            <p className="text-white/30 text-xs mt-1">GPS metadata auto-detected · set manually if missing</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleFileInput}
-            />
+            <div className="text-3xl mb-1">📸</div>
+            <p className="text-white/60 text-sm">Drop photos here or <span className="text-indigo-400 underline">browse files</span></p>
+            <p className="text-white/30 text-xs mt-0.5">GPS auto-detected · set manually if missing</p>
           </div>
+
+          {/* Explicit camera button — opens camera directly on Android/iOS */}
+          <button
+            onClick={() => cameraRef.current?.click()}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold
+                       transition-all active:scale-95 touch-manipulation"
+            style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}
+          >
+            📷 Take Photo with Camera
+          </button>
+
+          <input ref={fileRef}   type="file" accept="image/*" multiple  className="hidden" onChange={handleFileInput} />
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileInput} />
         </div>
 
         {/* Items list */}

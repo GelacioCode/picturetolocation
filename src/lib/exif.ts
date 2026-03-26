@@ -8,11 +8,26 @@ export interface ExifResult {
 
 export async function extractExif(file: File): Promise<ExifResult> {
   try {
-    const data = await exifr.parse(file, { gps: true, tiff: true, exif: true })
+    const data = await exifr.parse(file, {
+      gps: true, tiff: true, exif: true, xmp: true, iptc: false, icc: false,
+    })
     if (!data) return { latitude: null, longitude: null, datetime: null }
 
-    const latitude = typeof data.latitude === 'number' ? data.latitude : null
-    const longitude = typeof data.longitude === 'number' ? data.longitude : null
+    // Standard exifr GPS fields
+    let latitude: number | null  = typeof data.latitude  === 'number' ? data.latitude  : null
+    let longitude: number | null = typeof data.longitude === 'number' ? data.longitude : null
+
+    // Some Xiaomi / Android devices write raw GPS IFD fields instead
+    if (latitude == null && data.GPSLatitude != null && data.GPSLatitudeRef != null) {
+      const [d, m, s] = Array.isArray(data.GPSLatitude) ? data.GPSLatitude : [data.GPSLatitude, 0, 0]
+      latitude = d + m / 60 + s / 3600
+      if (data.GPSLatitudeRef === 'S') latitude = -latitude
+    }
+    if (longitude == null && data.GPSLongitude != null && data.GPSLongitudeRef != null) {
+      const [d, m, s] = Array.isArray(data.GPSLongitude) ? data.GPSLongitude : [data.GPSLongitude, 0, 0]
+      longitude = d + m / 60 + s / 3600
+      if (data.GPSLongitudeRef === 'W') longitude = -longitude
+    }
 
     let datetime: Date | null = null
     const raw = data.DateTimeOriginal ?? data.CreateDate ?? data.DateTime
