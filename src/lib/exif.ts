@@ -20,13 +20,15 @@ export async function extractExif(file: File): Promise<ExifResult> {
     // Some Xiaomi / Android devices write raw GPS IFD fields instead
     if (latitude == null && data.GPSLatitude != null && data.GPSLatitudeRef != null) {
       const [d, m, s] = Array.isArray(data.GPSLatitude) ? data.GPSLatitude : [data.GPSLatitude, 0, 0]
-      latitude = d + m / 60 + s / 3600
-      if (data.GPSLatitudeRef === 'S') latitude = -latitude
+      let v = (d as number) + (m as number) / 60 + (s as number) / 3600
+      if (data.GPSLatitudeRef === 'S') v = -v
+      latitude = v
     }
     if (longitude == null && data.GPSLongitude != null && data.GPSLongitudeRef != null) {
       const [d, m, s] = Array.isArray(data.GPSLongitude) ? data.GPSLongitude : [data.GPSLongitude, 0, 0]
-      longitude = d + m / 60 + s / 3600
-      if (data.GPSLongitudeRef === 'W') longitude = -longitude
+      let v = (d as number) + (m as number) / 60 + (s as number) / 3600
+      if (data.GPSLongitudeRef === 'W') v = -v
+      longitude = v
     }
 
     let datetime: Date | null = null
