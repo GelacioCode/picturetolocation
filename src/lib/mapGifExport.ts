@@ -26,9 +26,9 @@ function roundRect(
   ctx.closePath()
 }
 
-function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats) {
+function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats, countryName: string) {
   const pad   = 10
-  const cardW = (GIF_W - pad * 4) / 3
+  const cardW = (GIF_W - pad * 5) / 4
   const cardH = CARD_H - pad * 2
 
   const cards = [
@@ -45,6 +45,7 @@ function drawCards(ctx: CanvasRenderingContext2D, stats: VisitStats) {
         : '',
     },
     { label: 'COUNTRY OF ORIGIN', value: stats.originCountry, sub: '' },
+    { label: 'SELECTED MAP', value: countryName, sub: '' },
   ]
 
   cards.forEach((card, i) => {
@@ -205,6 +206,20 @@ export async function exportMapGIF(
     }
   }
 
+  // Arc origin: use stats origin if available, else centroid of photos
+  const originLat = stats?.originLat ?? photos.reduce((s, p) => s + p.lat, 0) / photos.length
+  const originLng = stats?.originLng ?? photos.reduce((s, p) => s + p.lng, 0) / photos.length
+
+  // Expand bbox to include arc origin if it's within 60 degrees of country center
+  const centerLat = (minLat + maxLat) / 2
+  const centerLng = (minLng + maxLng) / 2
+  if (Math.abs(originLat - centerLat) < 60 && Math.abs(originLng - centerLng) < 80) {
+    minLat = Math.min(minLat, originLat)
+    maxLat = Math.max(maxLat, originLat)
+    minLng = Math.min(minLng, originLng)
+    maxLng = Math.max(maxLng, originLng)
+  }
+
   const pLng = Math.max((maxLng - minLng) * 0.15, 1.5)
   const pLat = Math.max((maxLat - minLat) * 0.15, 1.5)
   const [west, east, south, north] = [minLng - pLng, maxLng + pLng, minLat - pLat, maxLat + pLat]
@@ -216,10 +231,6 @@ export async function exportMapGIF(
   const mapH    = GIF_H - mapTop - 8
 
   const project = makeProject(west, east, south, north, mapW, mapH, mapLeft, mapTop)
-
-  // Arc origin: use stats origin if available, else centroid of photos
-  const originLat = stats?.originLat ?? photos.reduce((s, p) => s + p.lat, 0) / photos.length
-  const originLng = stats?.originLng ?? photos.reduce((s, p) => s + p.lng, 0) / photos.length
 
   // Preload thumbnails
   const thumbs = new Map<string, HTMLImageElement>()
@@ -246,7 +257,7 @@ export async function exportMapGIF(
     ctx.fillRect(0, 0, GIF_W, GIF_H)
 
     // ── Stats cards ─────────────────────────────────────────
-    if (hasStats) drawCards(ctx, stats!)
+    if (hasStats) drawCards(ctx, stats!, countryName)
 
     // ── Map area background ──────────────────────────────────
     ctx.fillStyle = 'rgba(8,10,36,0.90)'

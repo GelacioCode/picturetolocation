@@ -1,9 +1,10 @@
-import { MdPublic, MdPlace, MdHome, MdAddAPhoto } from 'react-icons/md'
+import { MdPublic, MdPlace, MdHome, MdAddAPhoto, MdMap } from 'react-icons/md'
 import type { VisitStats } from '../types'
 
 interface Props {
   stats: VisitStats | null
   onUploadClick: () => void
+  selectedCountry?: { code: string; name: string } | null
 }
 
 function Card({
@@ -19,7 +20,7 @@ function Card({
 }) {
   return (
     <div
-      className="glass-card rounded-2xl px-3 py-3 flex items-center gap-3 min-w-0"
+      className="glass-card rounded-2xl px-3 py-3 flex items-center gap-3 shrink-0 min-w-[140px]"
     >
       {/* Icon circle */}
       <div
@@ -54,10 +55,10 @@ function Card({
   )
 }
 
-export default function StatsCards({ stats, onUploadClick }: Props) {
+export default function StatsCards({ stats, onUploadClick, selectedCountry }: Props) {
   return (
     <div className="px-3 py-2">
-      <div className="grid grid-cols-2 sm:flex sm:items-stretch gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-0.5">
         <Card
           icon={<MdPublic />}
           label="Countries"
@@ -80,11 +81,19 @@ export default function StatsCards({ stats, onUploadClick }: Props) {
           value={stats?.originCountry || '—'}
         />
 
+        {selectedCountry && (
+          <Card
+            icon={<MdMap />}
+            label="Map View"
+            value={selectedCountry.name}
+          />
+        )}
+
         {/* Add Photos */}
         <button
           onClick={onUploadClick}
           className="glass-card rounded-2xl px-3 py-3 flex items-center justify-center gap-2
-                     transition-all active:scale-95 touch-manipulation"
+                     transition-all active:scale-95 touch-manipulation shrink-0"
           style={{ color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.12)')}
           onMouseLeave={e => (e.currentTarget.style.background = '')}

@@ -172,20 +172,23 @@ export default function ShareButton({
         </button>
 
         {/* ── GIF type picker popover ─────────────────── */}
-        {phase === 'picking' && (
+        {phase === 'picking' && pickerAnchor && (
           <>
             {/* Backdrop — tap outside to dismiss */}
             <div
               className="fixed inset-0 z-40"
               onClick={() => setPhase('idle')}
             />
+            {/* Fixed position avoids being clipped by parent overflow:hidden */}
             <div
-              className="absolute right-0 top-full mt-2 z-50 rounded-2xl shadow-2xl overflow-hidden"
+              className="fixed z-50 rounded-2xl shadow-2xl overflow-hidden"
               style={{
+                top:   pickerAnchor.bottom + 8,
+                right: window.innerWidth - pickerAnchor.right,
                 background: 'var(--popover-bg)',
                 border: '1px solid var(--card-border)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
-                minWidth: 220,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                minWidth: 230,
               }}
             >
               <p
