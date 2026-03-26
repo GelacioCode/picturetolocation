@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { MdDarkMode, MdLightMode, MdMap, MdPublic, MdLayers } from 'react-icons/md'
+import { MdDarkMode, MdLightMode, MdMap, MdPublic, MdViewInAr } from 'react-icons/md'
 import { usePhotos } from './hooks/usePhotos'
 import StatsCards from './components/StatsCards'
 import GlobeView, { GlobeHandle } from './components/GlobeView'
 import CountryMapView from './components/CountryMapView'
-import CountryPolygonView from './components/CountryPolygonView'
+import CountryThreeView from './components/CountryThreeView'
 import CountryPicker from './components/CountryPicker'
 import type { CountryOption } from './components/CountryPicker'
 import OriginModal from './components/OriginModal'
@@ -205,9 +205,9 @@ export default function App() {
           />
         )}
 
-        {/* Canvas polygon map */}
+        {/* Three.js 3D polygon map */}
         {showPolygon && effectiveMapCode && (
-          <CountryPolygonView
+          <CountryThreeView
             photos={mapPhotos}
             countryCode={effectiveMapCode}
             onPhotoClick={setSelectedPhoto}
@@ -222,9 +222,9 @@ export default function App() {
           >
             {(
               [
-                { type: 'map'     as CountryViewType, icon: <MdMap size={13} />,     label: 'Map'     },
-                { type: 'polygon' as CountryViewType, icon: <MdLayers size={13} />,  label: 'Polygon' },
-                { type: '3d'      as CountryViewType, icon: <MdPublic size={13} />,  label: '3D'      },
+                { type: 'map'     as CountryViewType, icon: <MdMap size={13} />,       label: 'Map'    },
+                { type: 'polygon' as CountryViewType, icon: <MdViewInAr size={13} />,  label: '3D Map' },
+                { type: '3d'      as CountryViewType, icon: <MdPublic size={13} />,    label: 'Globe'  },
               ] as const
             ).map(btn => (
               <button
@@ -284,7 +284,7 @@ export default function App() {
               >
                 <MdMap size={22} style={{ color: '#818cf8' }} />
                 Street Map
-                <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>OpenStreetMap tiles</span>
+                <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>Zoomable OSM tiles</span>
               </button>
               <button
                 className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl text-sm font-semibold
@@ -292,9 +292,9 @@ export default function App() {
                 style={{ background: 'rgba(52,211,153,0.12)', color: 'var(--text)', border: '1px solid rgba(52,211,153,0.25)' }}
                 onClick={() => confirmView(pendingCountry, 'polygon')}
               >
-                <MdLayers size={22} style={{ color: '#34d399' }} />
-                Polygon Map
-                <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>Highlighted regions</span>
+                <MdViewInAr size={22} style={{ color: '#34d399' }} />
+                3D Map
+                <span className="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>Three.js polygon view</span>
               </button>
             </div>
           </div>

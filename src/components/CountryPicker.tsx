@@ -26,10 +26,7 @@ export default function CountryPicker({ countries, selected, onSelect }: Props) 
       className="shrink-0"
       style={{ borderTop: '1px solid var(--card-border)', background: 'var(--bg)' }}
     >
-      <div
-        className="flex gap-2 px-3 py-2"
-        style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any }}
-      >
+      <div className="flex flex-wrap gap-2 px-3 py-2">
         {/* Globe button */}
         <button
           onClick={() => onSelect(null)}
